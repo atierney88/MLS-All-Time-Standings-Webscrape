@@ -1,0 +1,61 @@
+from urllib2 import urlopen
+from bs4 import BeautifulSoup
+import pandas as pd
+
+url = "https://www.mlssoccer.com/stats/team?year=2017&season_type=REG&op=Search&form_build_id=form-eNf1Lk5eLHfFMlByLJcPkhBuGIspSUseOqmL6oFVUP8&form_id=mp7_stats_hub_build_filter_form"
+html = urlopen(url)
+soup = BeautifulSoup(html)
+
+#Get columns
+soup.findAll('tr', limit=1)[0].findAll('th')
+
+column_headers = [th.getText() for th in 
+                  soup.findAll('tr', limit=1)[0].findAll('th')]
+
+#Get the rest of the rows
+data_rows = soup.findAll('tr')[1:]
+team_data = [[td.getText() for td in data_rows[i].findAll('td')]
+            for i in range(len(data_rows))]
+
+#Create the 2017 Dataframe
+df = pd.DataFrame(team_data, columns=column_headers)
+
+#Convert Dataframe into intergers
+df = df.convert_objects(convert_numeric=True)
+
+#Create Overall Dataframe
+overall_df = pd.DataFrame()
+
+for year in range(2000, 2019): 
+    url = url.format(year=year)  
+    
+    html = urlopen(url) 
+    soup = BeautifulSoup(html, 'html5lib') 
+    
+    data_rows = soup.findAll('tr')[1:] 
+    Teams_data = [[td.getText() for td in data_rows[i].findAll('td')]
+                for i in range(len(data_rows))]
+    
+    year_df = pd.DataFrame(Teams_data, columns=column_headers)
+    
+    overall_df = overall_df.append(year_df, ignore_index=True)
+    
+#Convert to integer
+overall_df = overall_df.convert_objects(convert_numeric=True)
+    
+#Sort the data and combine the rows
+overall_df=overall_df.groupby("Club").sum()
+
+#Add blank row at the bottom of the table
+overall_df_t=overall_df
+overall_df_t=overall_df.T
+overall_df_t['']=['']*11
+overall_df=overall_df_t.T
+
+#Add another row at the bottom and insert a table key
+overall_df_t=overall_df
+overall_df_t=overall_df.T
+overall_df_t['Table Key']=["GP: Games Played", "G: Goals", "A: Assists", "SHT: Shots", "SOG: Shots on Goal", "FC: Fouls Committed", "FS: Fouls Suffered","OFF: Offsides","CK: Corner Kicks", "PKG: Penalty Kick Goals", "PKA: Penalty Kick Attempts"]
+overall_df=overall_df_t.T
+
+overall_df
