@@ -1,0 +1,516 @@
+#OVERALL DATAFRAME BASE
+
+import urllib.request
+from bs4 import BeautifulSoup, Comment
+import pandas as pd
+import numpy as np
+import locale
+from locale import atof
+import time
+import requests
+
+url = "https://fbref.com/en/comps/182/2946/2019-NWSL-Stats"
+html = urllib.request.urlopen(url)
+soup = BeautifulSoup(html, "lxml")
+
+#Find number of coumns and their headers
+soup.findAll('tr', limit=1)[0].findAll('th')
+
+column_headers = [th.getText() for th in 
+                  soup.findAll('tr', limit=1)[0].findAll('th')]
+columns=['Team','Total Matches Played',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential','Points',
+         'Attendance',
+         'Top Team Scorer','Goalkeeper',
+         'Notes', 
+         'Extra 1','Extra 2','Extra 3','Extra 4','Extra 5','Extra 6']
+
+#Get the rest of the rows
+data_rows = soup.findAll('tr')[1:]
+team_data = [[td.getText() for td in data_rows[i].findAll('td')]
+            for i in range(len(data_rows))]
+
+#Create the Master Data Frame
+df = pd.DataFrame(team_data, columns=columns)
+
+#Clean to only get columns and rows for the overall table
+overall_df=df.iloc[0:9]
+overall_df=overall_df[['Team','Total Matches Played',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential','Points',
+         'Attendance',
+         'Top Team Scorer','Goalkeeper']]
+
+overall_df=overall_df.sort_values(by='Team')
+
+
+locale.setlocale(locale.LC_NUMERIC, '')
+overall_df[['Total Matches Played',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential','Points',
+         'Attendance']]=overall_df[['Total Matches Played',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential','Points',
+         'Attendance']].applymap(atof)
+
+overall_df=overall_df.reset_index(drop=True)
+
+time.sleep(1)
+
+#Clean to only get columns and rows for the overall home table 
+home=df.iloc[11:]
+home=home[['Team','Total Matches Played',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential','Points',
+         'Attendance']]
+home.columns=['Team','Home Matches Played',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential','Points','Points Per Game']
+home=home.reset_index(drop=True)
+home[['Home Matches Played','Points','Points Per Game',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential']]=home[['Home Matches Played','Points','Points Per Game',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential']].applymap(atof)
+
+home['Win %']=home['Wins']/home['Home Matches Played']
+home['Win %'] = pd.Series(["{0:.2f}%".format(val * 100) for val in home['Win %']], index = home.index)
+home['Draw %']=home['Draws']/home['Home Matches Played']
+home['Draw %'] = pd.Series(["{0:.2f}%".format(val * 100) for val in home['Draw %']], index = home.index)
+home['Loss %']=home['Losses']/home['Home Matches Played']
+home['Loss %'] = pd.Series(["{0:.2f}%".format(val * 100) for val in home['Loss %']], index = home.index)
+home['Goals For/90'] = home['Goals For']/home['Home Matches Played']
+home['Goals Against/90'] = home['Goals Against']/home['Home Matches Played']
+
+home=home[['Team', 'Home Matches Played', 'Points', 'Points Per Game', 'Wins','Win %', 'Draws','Draw %', 'Losses','Loss %', 'Goals For',
+       'Goals For/90','Goals Against','Goals Against/90', 'Goal Differential'
+          ]]
+
+home=home.round(2)
+home=home.sort_values(by='Points', ascending=False)
+
+
+overall_df.set_index('Team')
+
+#Clean to only get columns and rows for the overall away table 
+away=df.iloc[11:]
+away=away[['Team','Top Team Scorer','Goalkeeper',
+         'Notes', 
+         'Extra 1','Extra 2','Extra 3','Extra 4','Extra 5','Extra 6']]
+away.columns=['Team','Away Matches Played',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential','Points',
+         'Points Per Game']
+away=away.reset_index(drop=True)
+away[['Away Matches Played',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential','Points',
+         'Points Per Game']]=away[['Away Matches Played',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential','Points',
+         'Points Per Game']].applymap(atof)
+
+away['Win %']=away['Wins']/away['Away Matches Played']
+away['Win %'] = pd.Series(["{0:.2f}%".format(val * 100) for val in away['Win %']], index = away.index)
+away['Draw %']=away['Draws']/away['Away Matches Played']
+away['Draw %'] = pd.Series(["{0:.2f}%".format(val * 100) for val in away['Draw %']], index = away.index)
+away['Loss %']=away['Losses']/away['Away Matches Played']
+away['Loss %'] = pd.Series(["{0:.2f}%".format(val * 100) for val in away['Loss %']], index = away.index)
+away['Goals For/90'] = away['Goals For']/away['Away Matches Played']
+away['Goals Against/90'] = away['Goals Against']/away['Away Matches Played']
+
+away=away[['Team', 'Away Matches Played','Points', 'Points Per Game', 'Wins','Win %', 'Draws','Draw %', 'Losses','Loss %', 'Goals For',
+       'Goals For/90','Goals Against','Goals Against/90', 'Goal Differential'
+          ]]
+
+away=away.round(2)
+away=away.sort_values(by='Points', ascending=False)
+
+time.sleep(1)
+
+#SQUAD DATAFRAME
+squad_url = "https://fbref.com/en/comps/182/2946/stats/2019-NWSL-Stats"
+squad_html = urllib.request.urlopen(squad_url)
+squad_soup = BeautifulSoup(squad_html, "lxml")
+
+#Find number of coumns and their headers
+squad_soup.findAll('tr', limit=1)[0].findAll('th')
+
+squad_column_headers = [th.getText() for th in 
+                  soup.findAll('tr', limit=1)[0].findAll('th')]
+columns=['Team','Total Matches Played',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential','Points',
+         'Attendance',
+         'Top Team Scorer','Goalkeeper',
+         'Notes', 
+         'Extra 1','Extra 2','Extra 3']
+
+#Get the rest of the rows
+squad_data_rows = squad_soup.findAll('tr')[2:]
+squad_data = [[td.getText() for td in squad_data_rows[i].findAll('td')]
+            for i in range(len(squad_data_rows))]
+
+teams = [[td.getText() for td in squad_data_rows[i].findAll('th')]
+            for i in range(len(squad_data_rows))]
+teams=[str(i) for i in teams]
+
+squad_df = pd.DataFrame(squad_data, columns=columns)
+squad_df['Squad']= teams
+squad_df= squad_df[['Squad','Team', 'Total Matches Played', 'Wins', 'Draws', 'Losses', 'Goals For',
+       'Goals Against', 'Goal Differential', 'Points', 'Attendance',
+       'Top Team Scorer', 'Goalkeeper', 'Notes', 'Extra 1', 'Extra 2',
+       'Extra 3']]
+squad_df.columns = ['Team','# of Players Played',"% Posession",'Matches Played','Total Starts','Minutes',
+                    'Goals','Assists',"PK's Scored",'PK Attempts',
+                    'Yellow Cards','Red Cards',
+                    'Goals/90','Assists/90','Goals + Assists/90',"Goals - PK's/90","Goals + Assists-PK's/90"]
+squad_df[['# of Players Played','Matches Played','Total Starts','Minutes',
+                    'Goals','Assists',"PK's Scored",'PK Attempts',
+                    'Yellow Cards','Red Cards',
+                    'Goals/90','Assists/90','Goals + Assists/90',"Goals - PK's/90","Goals + Assists-PK's/90"]]=squad_df[['# of Players Played','Matches Played','Total Starts','Minutes',
+                    'Goals','Assists',"PK's Scored",'PK Attempts',
+                    'Yellow Cards','Red Cards',
+                    'Goals/90','Assists/90','Goals + Assists/90',"Goals - PK's/90","Goals + Assists-PK's/90"]].applymap(atof)
+squad_df['Team']=squad_df['Team'].str[1:-1]
+squad_df['Team']=squad_df['Team'].str.replace(r"[\"\',]", '')
+squad_df.set_index('Team')
+
+time.sleep(1)
+
+
+#SQUAD GOALKEEPER DATAFRAME
+squad_gk_url = "https://fbref.com/en/comps/182/2946/keepers/2019-NWSL-Stats"
+squad_gk_html = urllib.request.urlopen(squad_gk_url)
+squad_gk_soup = BeautifulSoup(squad_gk_html, "lxml")
+
+#Find number of coumns and their headers
+squad_gk_soup.findAll('tr', limit=1)[0].findAll('th')
+
+squad_gk_column_headers = [th.getText() for th in 
+                  squad_gk_soup.findAll('tr', limit=1)[0].findAll('th')]
+squad_gk_columns=['Team','Total Matches Played',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential','Points',
+         'Attendance',
+         'Top Team Scorer','Goalkeeper',
+         'Notes', 
+         'Extra 1','Extra 2','Extra 3', 'Extra 4', 'Extra 5']
+#Get the rest of the rows
+squad_gk_data_rows = squad_gk_soup.findAll('tr')[2:]
+squad_gk_data = [[td.getText() for td in squad_gk_data_rows[i].findAll('td')]
+            for i in range(len(squad_gk_data_rows))]
+
+teams = [[td.getText() for td in squad_gk_data_rows[i].findAll('th')]
+            for i in range(len(squad_gk_data_rows))]
+teams=[str(i) for i in teams]
+
+squad_gk_df = pd.DataFrame(squad_gk_data, columns=squad_gk_columns)
+squad_gk_df['Squad']= teams
+squad_gk_df= squad_gk_df[['Squad','Team','Total Matches Played',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential','Points',
+         'Attendance',
+         'Top Team Scorer','Goalkeeper',
+         'Notes', 
+         'Extra 1','Extra 2','Extra 3', 'Extra 4', 'Extra 5']]
+squad_gk_df.columns = ['Team x',"# of GK's Used",'Matches Played','Starts','Min','Goals Against','Goals Against/90',
+                       'extra 1','extra 2','extra 3', 'wins','draws','losses',
+                       'Clean Sheets','Clean Sheet %','Opp. PK Attempts','Opp. PK Goals',"Opp. PK's Saved", "Opp. PK's Missed"]
+squad_gk_df['Team x']=squad_gk_df['Team x'].str[1:-1]
+squad_gk_df['Team x']=squad_gk_df['Team x'].str.replace(r"[\"\',]", '')
+squad_gk_df=squad_gk_df.drop(['Matches Played','Starts','Goals Against','extra 1','extra 2','extra 3', 'wins','draws','losses'], axis=1)
+squad_gk_df[["# of GK's Used", 'Goals Against/90', 'Clean Sheets',
+       'Clean Sheet %', 'Opp. PK Attempts', 'Opp. PK Goals', "Opp. PK's Saved",
+       "Opp. PK's Missed"]]=squad_gk_df[["# of GK's Used", 'Goals Against/90', 'Clean Sheets',
+       'Clean Sheet %', 'Opp. PK Attempts', 'Opp. PK Goals', "Opp. PK's Saved",
+       "Opp. PK's Missed"]].applymap(atof)
+
+time.sleep(1)
+
+#SQUAD SUBS DATAFRAME
+squad_sub_url = "https://fbref.com/en/comps/182/2946/playingtime/2019-NWSL-Stats"
+squad_sub_html = urllib.request.urlopen(squad_sub_url)
+squad_sub_soup = BeautifulSoup(squad_sub_html, "lxml")
+
+#Find number of coumns and their headers
+squad_sub_soup.findAll('tr', limit=1)[0].findAll('th')
+
+squad_sub_column_headers = [th.getText() for th in 
+                  squad_sub_soup.findAll('tr', limit=1)[0].findAll('th')]
+squad_sub_columns=['Team','Total Matches Played',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential','Points',
+         'Attendance',
+         'Top Team Scorer','Goalkeeper',
+         'Notes', 
+         'Extra 1','Extra 2']
+#Get the rest of the rows
+squad_sub_data_rows = squad_sub_soup.findAll('tr')[2:]
+squad_sub_data = [[td.getText() for td in squad_sub_data_rows[i].findAll('td')]
+            for i in range(len(squad_sub_data_rows))]
+
+sub_teams = [[td.getText() for td in squad_sub_data_rows[i].findAll('th')]
+            for i in range(len(squad_sub_data_rows))]
+sub_teams=[str(i) for i in teams]
+
+squad_sub_df = pd.DataFrame(squad_sub_data, columns=squad_sub_columns)
+squad_sub_df['Squad']= sub_teams
+squad_sub_df= squad_sub_df[['Squad','Team','Total Matches Played',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential','Points',
+         'Attendance',
+         'Top Team Scorer','Goalkeeper',
+         'Notes', 
+         'Extra 1','Extra 2']]
+squad_sub_df.columns = ['Squad',"# of Player's Used",'Matches Played','Starts','Min','Goals Against','Goals Against/90',
+                       'extra 1','Subs Used','extra 3', 'Unused Subs','draws','losses',
+                       'Clean Sheets','Clean Sheet %','Opp. PK Attempts']
+squad_sub_df['Squad']=squad_sub_df['Squad'].str[1:-1]
+squad_sub_df['Squad']=squad_sub_df['Squad'].str.replace(r"[\"\',]", '')
+squad_sub_df= squad_sub_df[['Squad','Subs Used','Unused Subs']]
+squad_sub_df[['Subs Used','Unused Subs']]=squad_sub_df[['Subs Used','Unused Subs']].applymap(atof)
+
+time.sleep(1)
+
+#SQUAD MISC DATAFRAME
+squad_misc_url = "https://fbref.com/en/comps/182/2946/misc/2019-NWSL-Stats"
+squad_misc_html = urllib.request.urlopen(squad_misc_url)
+squad_misc_soup = BeautifulSoup(squad_misc_html, "lxml")
+
+#Find number of coumns and their headers
+squad_misc_soup.findAll('tr', limit=1)[0].findAll('th')
+
+squad_misc_column_headers = [th.getText() for th in 
+                 squad_misc_soup.findAll('tr', limit=1)[0].findAll('th')]
+squad_misc_columns=['Team','Total Matches Played',
+         'Wins','Draws','Losses',
+         'Goals For','Goals Against','Goal Differential','Points',
+         'Attendance',
+         'Top Team Scorer','Goalkeeper',
+         'Notes']
+#Get the rest of the rows
+squad_misc_data_rows = squad_misc_soup.findAll('tr')[2:]
+squad_misc_data = [[td.getText() for td in squad_misc_data_rows[i].findAll('td')]
+            for i in range(len(squad_misc_data_rows))]
+
+squad_misc_teams = [[td.getText() for td in squad_misc_data_rows[i].findAll('th')]
+            for i in range(len(squad_misc_data_rows))]
+squad_misc_teams=[str(i) for i in teams]
+
+squad_misc_df = pd.DataFrame(squad_misc_data, columns=squad_misc_columns)
+squad_misc_df['Squad']= squad_misc_teams
+squad_misc_df=squad_misc_df[['Squad','Draws','Notes']]
+squad_misc_df.columns=['Squad x','Second Yellow Cards','Own Goals']
+squad_misc_df[['Second Yellow Cards','Own Goals']]=squad_misc_df[['Second Yellow Cards','Own Goals']].applymap(atof)
+
+time.sleep(1)
+
+
+#TEAM DATAFRAME
+team_df=pd.concat([overall_df, squad_df,squad_gk_df,squad_sub_df,squad_misc_df], axis=1)
+
+team_df.columns = ['Team', 'Total Matches Played', 'Wins', 'Draws', 'Losses', 'Goals For',
+       'Goals Against', 'Goal Differential', 'Points', 'Attendance',
+       'Top Team Scorer', 'Goalkeeper', 'Team_D', '# of Players Played',
+       '% Posession', 'Matches Played', 'Total Starts', 'Minutes', 'Goals',
+       'Assists', "PK Goals", 'PK Attempts', 'Yellow Cards', 'Red Cards',
+       'Goals/90', 'Assists/90', "Goals + Assists/90", "Goals - PK's/90",
+       "Goals + Assists-PK's/90",'Team x', "# of GK's Used", 'Min', 'Goals Against/90', 'Clean Sheets',
+       'Clean Sheet %', 'Opp. PK Attempts', 'Opp. PK Goals', "Opp. PK's Saved",
+       "Opp. PK's Missed",'Squad','Subs Used','Unused Subs','Squad x','Second Yellow Cards','Own Goals']
+team_df=team_df.drop(['Team_D','Goals','Matches Played','Team x','Min','Squad','Squad x'], axis=1)
+
+#Added Columns
+team_df['Points/90']=team_df['Points']/team_df['Total Matches Played']
+team_df["Points/90 in Last 5 Matches"] = ""
+team_df['Win %']=team_df['Wins']/team_df['Total Matches Played']
+team_df['Win %'] = pd.Series(["{0:.2f}%".format(val * 100) for val in team_df['Win %']], index = team_df.index)
+team_df['Draw %']=team_df['Draws']/team_df['Total Matches Played']
+team_df['Draw %'] = pd.Series(["{0:.2f}%".format(val * 100) for val in team_df['Draw %']], index = team_df.index)
+team_df['Loss %']=team_df['Losses']/team_df['Total Matches Played']
+team_df['Loss %'] = pd.Series(["{0:.2f}%".format(val * 100) for val in team_df['Loss %']], index = team_df.index)
+team_df['PK Goal Share'] = team_df['PK Goals']/team_df['Goals For']
+team_df['PK Goal Share'] = pd.Series(["{0:.2f}%".format(val * 100) for val in team_df['PK Goal Share']], index = team_df.index)
+
+#Order columns based on relevance
+team_df = team_df[['Team','Points','Points/90',"Points/90 in Last 5 Matches",'Total Matches Played',
+             'Wins','Win %','Draws','Draw %', 'Losses','Loss %',
+             'Goals For','Goals/90','Top Team Scorer','Goals Against','Goals Against/90','Goal Differential','Goals + Assists/90','Own Goals',
+            "PK Attempts","PK Goals",'PK Goal Share',"Goals - PK's/90","Goals + Assists-PK's/90",'Opp. PK Attempts', 'Opp. PK Goals', "Opp. PK's Saved","Opp. PK's Missed",
+             'Assists','Assists/90',
+             '% Posession',
+            '# of Players Played','Total Starts','Minutes','Subs Used','Unused Subs','Yellow Cards','Second Yellow Cards','Red Cards',
+            "# of GK's Used",'Goalkeeper','Clean Sheets','Clean Sheet %',
+            'Attendance']]
+
+team_df=team_df.round(2)
+team_df=team_df.sort_values(by='Points', ascending=False)
+
+time.sleep(1)
+
+#NATIONS DATAFRAME
+nation_url = "https://fbref.com/en/comps/182/2946/nations/2019-NWSL-Nationalities"
+nation_html = urllib.request.urlopen(nation_url)
+nation_soup = BeautifulSoup(nation_html, "lxml")
+
+#Find number of coumns and their headers
+nation_soup.findAll('tr', limit=1)[0].findAll('th')
+
+nation_column_headers = [th.getText() for th in 
+                  nation_soup.findAll('tr', limit=1)[0].findAll('th')]
+nation_columns = ['Nation', '# of Players', "Total Minutes", 'Players']
+
+#Get the rest of the rows
+nation_data_rows = nation_soup.findAll('tr')[1:]
+nation_team_data = [[td.getText() for td in nation_data_rows[i].findAll('td')]
+            for i in range(len(nation_data_rows))]
+
+#Create dataframe and clean 
+nation_df = pd.DataFrame(nation_team_data, columns=nation_columns)
+nation_df['Nation']=nation_df['Nation'].str[3:]
+locale.setlocale(locale.LC_NUMERIC, '')
+nation_df[['# of Players','Total Minutes']]=nation_df[['# of Players','Total Minutes']].applymap(atof)
+nation_df['% of League']=nation_df['# of Players']/nation_df['# of Players'].sum()
+nation_df['% of League'] = nation_df['% of League'].astype(float).map("{:.2%}".format)
+nation_df=nation_df[['Nation','% of League','# of Players', 'Total Minutes', 'Players']]
+
+time.sleep(1)
+
+#PLAYER STANDARD DATAFRAME
+
+#Scrape HTML and create empty list for data
+players_standard_res = requests.get("https://fbref.com/en/comps/182/2946/stats/2019-NWSL-Stats",headers={"User-Agent":"Mozilla/5.0"})
+players_standard_soup = BeautifulSoup(players_standard_res.text, 'lxml')
+players_standard_data = []
+
+#iterate through comments to collect data
+for comment in players_standard_soup.find_all(string=lambda text:isinstance(text,Comment)):
+    players_standard_parse = BeautifulSoup(comment,"lxml")
+    for items in players_standard_parse.select("table.min_width tr"):
+        tds = [item.get_text(strip=True) for item in items.select("th,td")]
+        players_standard_data.extend(tds)
+
+#Build frame of data, insert data and clean data
+columns = players_standard_data[5:27]
+players_standard_data = players_standard_data[27:]
+players = [players_standard_data[i:i + 22] for i in range(0, len(players_standard_data), 22)]
+players_standard = pd.DataFrame(players, columns=columns)
+players_standard['Nation']=players_standard['Nation'].str[2:]
+players_standard=players_standard.drop(['Matches'], axis=1)
+players_standard=players_standard[~players_standard.Age.str.contains("Age")]
+players_standard=players_standard.reset_index(drop=True)
+locale.setlocale(locale.LC_NUMERIC, '')
+#players_standard['Age'] = players_standard['Age'].astype(str).astype(int)
+#players_standard['Born'] = players_standard['Born'].astype(str).astype(int)
+players_standard['MP'] = players_standard['MP'].astype(str).astype(int)
+players_standard['Starts'] = players_standard['Starts'].astype(str).astype(int)
+players_standard[['Min']]=players_standard[['Min']].applymap(atof)
+players_standard.columns = [['Rank', 'Player', 'Nation', 'Position', 'Team', 'Age', 'Birth Year', 'Matches Played', 
+                             'Starts','Minutes Played', 'Goals', 'Assists', "PK's Scored", 'PK Attempts', 
+                             'Yellow Cards', 'Red Cards', 'Goals Per 90', 'Assists Per 90', 'Goals+Assists Per 90',
+                               'Goals-PK Goals Per 90', 'Goals+Assists-PK Goals Per 90']]
+players_standard['Goals'] = players_standard['Goals'].astype(str).astype(int)
+players_standard['Assists'] = players_standard['Assists'].astype(str).astype(int)
+players_standard["PK's Scored"] = players_standard["PK's Scored"].astype(str).astype(int)
+players_standard['PK Attempts'] = players_standard['PK Attempts'].astype(str).astype(int)
+players_standard['Yellow Cards'] = players_standard['Yellow Cards'].astype(str).astype(int)
+players_standard['Red Cards'] = players_standard['Red Cards'].astype(str).astype(int)
+players_standard[['Goals Per 90', 'Assists Per 90', 'Goals+Assists Per 90',
+                               'Goals-PK Goals Per 90', 'Goals+Assists-PK Goals Per 90']]=players_standard[['Goals Per 90', 'Assists Per 90', 'Goals+Assists Per 90',
+                               'Goals-PK Goals Per 90', 'Goals+Assists-PK Goals Per 90']].applymap(atof)
+
+time.sleep(1)
+
+#TIME DATAFRAME
+
+#Scrape HTML and create empty list for data
+time_res = requests.get("https://fbref.com/en/comps/182/2946/playingtime/2019-NWSL-Stats",headers={"User-Agent":"Mozilla/5.0"})
+time_soup = BeautifulSoup(time_res.text, 'lxml')
+time_data = []
+
+#iterate through comments to collect data
+for comment in time_soup.find_all(string=lambda text:isinstance(text,Comment)):
+    time_parse = BeautifulSoup(comment,"lxml")
+    for items in time_parse.select("table.min_width tr"):
+        tds = [item.get_text(strip=True) for item in items.select("th,td")]
+        time_data.extend(tds)
+
+#Build frame of data, insert data and clean data
+columns = time_data[6:30]
+time_data = time_data[30:]
+time_data = [time_data[i:i + 24] for i in range(0, len(time_data), 24)]
+time_df = pd.DataFrame(time_data, columns=columns)
+time_df['Nation']=time_df['Nation'].str[2:]
+time_df=time_df.drop(['Matches'], axis=1)
+locale.setlocale(locale.LC_NUMERIC, '')
+time_df.columns = ['Rank', 'Player', 'Nation', 'Position', 'Team', 'Age', 'Birth Year', 
+                 'Matches Played', 'Minutes Played','Minutes Played Per 90',"% of Team's Total Minutes",'Minutes played/90',
+                 'Starts','Started Minumtes Per 90  (min. 45 min)',
+                      'Sub Matches', 'Sub Minutes (min. 45 min)', 'Unused Sub Matches', 'Points Per 90 Played (min. 45 min)', 'Goals Scored When On Pitch',
+                      'Goals Against When On Pitch', '+/-', '+/- Per 90', 'Net Goals Per 90 On-Off']
+time_df=time_df[~time_df.Age.str.contains("Age")]
+time_df=time_df.reset_index(drop=True)
+time_df['Matches Played'] = time_df['Matches Played'].astype(str).astype(int) 
+time_df['Starts'] = time_df['Starts'].astype(str).astype(int)
+time_df['Sub Matches'] = time_df['Sub Matches'].astype(str).astype(int)
+time_df['Unused Sub Matches'] = time_df['Unused Sub Matches'].astype(str).astype(int)   
+
+time.sleep(1)
+
+#GOALKEEPER DATAFRAME
+
+#Scrape HTML and create empty list for data
+goalkeeper_res = requests.get("https://fbref.com/en/comps/182/2946/keepers/2019-NWSL-Stats",headers={"User-Agent":"Mozilla/5.0"})
+goalkeeper_soup = BeautifulSoup(goalkeeper_res.text, 'lxml')
+goalkeeper_data = []
+
+#iterate through comments to collect data
+for comment in goalkeeper_soup.find_all(string=lambda text:isinstance(text,Comment)):
+    goalkeeper_parse = BeautifulSoup(comment,"lxml")
+    for items in goalkeeper_parse.select("table.min_width tr"):
+        tds = [item.get_text(strip=True) for item in items.select("th,td")]
+        goalkeeper_data.extend(tds)
+
+#Build frame of data, insert data and clean data
+columns = goalkeeper_data[5:30]
+goalkeeper_data = goalkeeper_data[30:]
+goalkeeper_data = [goalkeeper_data[i:i + 25] for i in range(0, len(goalkeeper_data), 25)]
+goalkeeper = pd.DataFrame(goalkeeper_data, columns=columns)
+goalkeeper['Nation']=goalkeeper['Nation'].str[2:]
+goalkeeper=goalkeeper.drop(['Matches'], axis=1)
+locale.setlocale(locale.LC_NUMERIC, '')
+goalkeeper.columns = ['Rank', 'Goalkeeper', 'Nation', 'Position', 'Team', 'Age', 'Birth Year', 'Matches Played', 'Starts',
+       'Minutes Played', 'Goals Allowed', 'Goals Allowed Per 90', 'Shots on Target Against', 'Saves', 'Save %', 'Wins', 'Draws', 'Losses', 'Clean Sheets',
+       'Clean Sheet %', 'PK Attempts', 'PK Goals Allowed', 'PK Saves', 'PK Misses']
+goalkeeper['Age'] = goalkeeper['Age'].astype(str).astype(int)
+goalkeeper['Birth Year'] = goalkeeper['Birth Year'].astype(str).astype(int)
+goalkeeper['Matches Played'] = goalkeeper['Matches Played'].astype(str).astype(int)
+goalkeeper['Starts'] = goalkeeper['Starts'].astype(str).astype(int)
+goalkeeper['Wins'] = goalkeeper['Wins'].astype(str).astype(int)
+goalkeeper['Draws'] = goalkeeper['Draws'].astype(str).astype(int)
+goalkeeper['Losses'] = goalkeeper['Losses'].astype(str).astype(int)
+goalkeeper['Clean Sheets'] = goalkeeper['Clean Sheets'].astype(str).astype(int)
+goalkeeper['PK Attempts'] = goalkeeper['PK Attempts'].astype(str).astype(int)
+goalkeeper['PK Goals Allowed'] = goalkeeper['PK Goals Allowed'].astype(str).astype(int)
+goalkeeper['PK Saves'] = goalkeeper['PK Saves'].astype(str).astype(int)
+goalkeeper['PK Misses'] = goalkeeper['PK Misses'].astype(str).astype(int)
+
+goalkeeper[['Minutes Played']]=goalkeeper[['Minutes Played']].applymap(atof)
+
+
+
+#EXPORTING TO EXCEL
+
+writer = pd.ExcelWriter('NWSL Field of Vision - Scrapped Data.xlsx', engine='xlsxwriter')
+
+team_df.to_excel(writer,sheet_name='Team')
+home.to_excel(writer,sheet_name='Team (Home)')
+away.to_excel(writer,sheet_name='Team (Away)')
+nation_df.to_excel(writer,sheet_name='Nations')
+players_standard.to_excel(writer,sheet_name='Players')
+time_df.to_excel(writer,sheet_name='Playing Time')
+goalkeeper.to_excel(writer,sheet_name='Goalkeepers')
+
+writer.save()
