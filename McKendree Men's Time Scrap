@@ -1,0 +1,134 @@
+#MEN'S SWIMMING TIME SCRAPE AND DATAFRAME CREATION: Season 16/17
+
+import urllib.request
+from bs4 import BeautifulSoup
+import pandas as pd
+import numpy as np
+import time
+
+season_total=[]
+event_total=[]
+index=0
+season=20
+events=[150,1100,1200,1500,11000,11650,
+        250,2100,2200,
+        350,3100,3200,
+        450,4100,4200,
+        5100,5200,5400,
+        6200,6400,6800,
+        7200,7400]
+
+#GET FIRST TABLE WITH 5 COLUMNS
+url = ("https://www.collegeswimming.com/team/10008207/times/?page=1&gender=M&event={}&course=Y&season=20")
+ 
+
+#Create initial race Dataframe 
+sixteen = pd.DataFrame(columns=['#','Name', 'Team', 'Meet', 'Time','NCAA Cut/Relay'])
+
+while index<len(events):
+    event = events[index]
+    print(event)
+    url_open = urllib.request.urlopen("https://www.collegeswimming.com/team/10008207/times/?page=1&gender=M&event={}&course=Y&season=20".format(event))
+    soup = BeautifulSoup (url_open, "lxml") 
+    
+    #Get season
+    season_title=soup.find_all('h2')
+    season_title=str(season_title)
+    season_title=season_title[52:76]
+    print('Season: {}'.format(season_title))
+
+    #Get event
+    event_title=soup.find_all('h2')
+    event_title=str(event_title)
+    event_title=event_title[35:51]
+    print('Event: {}'.format(event_title))
+
+    #Get the rest of the rows
+    data_rows = soup.find_all('tr')[1:]
+    swimmer_data = [[td.getText() for td in data_rows[i].findAll('td')]
+            for i in range(len(data_rows))]
+    print("Swimmer_data length: {}".format(len(swimmer_data)))
+    
+    #adjust data based on number of columns
+    if not swimmer_data:
+        print('No swimmers participated in this event this year.')
+        
+    elif len(swimmer_data[0])==5:
+        for x in swimmer_data:
+            x.append('')
+            temp_df = pd.DataFrame(swimmer_data, columns=['#','Name', 'Team', 'Meet', 'Time','NCAA Cut/Relay'])
+    else:
+        temp_df = pd.DataFrame(swimmer_data, columns=['#','Name', 'Team', 'Meet', 'Time','NCAA Cut/Relay'])
+    
+    
+    sixteen=sixteen.append(temp_df)
+    length=len(swimmer_data)
+    print('Swimmer total: {}'.format(length))
+    season_list=(season_title,)*length
+    season_total.extend(season_list)
+    print(len(season_total))
+        
+    event_list=(event_title,)*length
+    event_total.extend(event_list)
+  
+    index = index + 1
+    
+    time.sleep(2)
+    
+    
+    
+#Clean final data
+sixteen = sixteen.replace('\n','', regex=True)
+sixteen = sixteen.drop_duplicates(keep='first')
+sixteen = sixteen.reset_index(drop=True)
+print(sixteen.shape)
+print(len(season_total))
+print(len(event_total))
+sixteen['Season']=season_total
+sixteen['Event']=event_total
+sixteen['Name']=sixteen['Name'].str.title()
+sixteen['Season']='2016-2017'
+sixteen['Event']=sixteen['Event'].str.strip(' - SCY - ')
+sixteen.at[41, 'Event'] = '50 Fly'
+sixteen.at[52:53, 'Event'] = '100 IM'
+sixteen.at[54:57, 'Event'] = '200 IM'
+sixteen.at[58:61, 'Event'] = '400 IM'
+
+#EVERYTHING ABOVE WAS REPEATED FOR EACH SEASON. THIS IS A SLOWER METHOD TO COLLECTING THE DATA, BUT HELPS ENSURE THE QUALITY OF THE DATA
+#ONCE ALL SEASONS WERE COLLECTED, A MASTER DATAFRAME WAS CRATED.
+
+#MASTER CREATION AND TIME FORMATTING
+
+from datetime import datetime, timedelta
+
+master = pd.concat([sixteen,seventeen,eighteen,nineteen])
+
+time_edits=master['Time']
+
+time_edits=list(time_edits)
+
+for (i,item) in enumerate(time_edits):
+    if len(item)==7:
+        time_edits[i] = '0'+item
+        
+    elif len(item)==5:
+        time_edits[i] = '00:'+item
+    
+    else:
+        time_edits[i] = item
+
+    
+master['Time']=time_edits
+
+master.reset_index()
+
+def convert_date_string_to_datetime(time_string):
+    t=datetime.strptime(time_string, "%M:%S.%f")
+    delta = timedelta(minutes=t.minute, seconds=t.second, microseconds=t.microsecond)
+    return delta
+
+master['Time']= master['Time'].apply(convert_date_string_to_datetime)
+
+#EXPORTING TO EXCEL
+
+master.to_csv ('/Users/atierney88/Documents/Coaching/McKendree Analytics/McKendree_Times_Men.csv', index = False, header=True)
